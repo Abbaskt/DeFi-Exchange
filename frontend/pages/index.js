@@ -35,7 +35,7 @@ export default function Home() {
 
   // Variables to keep track of Swap functionality
   const [swapAmount, setSwapAmount] = useState(zero);
-  const [tokenToBeReceivedAfterSwap, setTokenToBeReceivedAfterSwap] = useState(zero);
+  const [tokensToBeReceivedAfterSwap, setTokensToBeReceivedAfterSwap] = useState(zero);
   const [ethSelected, setEthSelected] = useState(zero);
 
   const web3ModelRef = useRef();
@@ -122,10 +122,55 @@ export default function Home() {
         _ethBalance,
         cryptoDevTokenReserve
       )
-      setRemoveEther(zero);
-      setRemoveCD(zero);
+      setRemoveEther(_removeEther);
+      setRemoveCD(_removeCD);
     }catch(err){
       console.error(err)
+    }
+  }
+
+  const _swapTokens = async() => {
+    try{
+      const swapAmountWei = utils.parseEther(swapAmount);
+      
+      if (!swapAmountWei.eq(zero)) {
+        const signer = await getProviderOrSigner(true);
+        setLoading(true);
+        await swapTokens(
+          signer,
+          swapAmountWei,
+          tokensToBeReceivedAfterSwap,
+          ethSelected
+        )
+        setLoading(false);
+        await getAmounts();
+        setSwapAmount(zero);
+        setTokensToBeReceivedAfterSwap(zero)
+      }
+    }catch(err){
+      console.error(err)
+    }
+  }
+
+  const _getAmountOfTokensReceivedFromSwap = async (_swapAmount) => {
+    try{
+      const _swapAmountWei = utils.parseEther(_swapAmount.toString());
+      if(!_swapAmountWei.eq(zero)){
+        const provider = await getProviderOrSigner();
+        const _ethBalance = await getEtherBalance(provider, null, true);
+        const amountOfTokens = await getAmountOfTokensReceivedFromSwap(
+          _swapAmountWei,
+          provider,
+          ethSelected,
+          _ethBalance,
+          reservedCD
+        )
+        setTokensToBeReceivedAfterSwap(amountOfTokens);
+      } else {
+        setTokensToBeReceivedAfterSwap(zero);
+      }
+    }catch(err){
+      console.error(err);
     }
   }
 
@@ -219,7 +264,7 @@ export default function Home() {
                     <div className={styles.inputDiv}>
                       {`You will need ${utils.formatEther(addCDTokens)} Crypto Dev Tokens`}
                     </div>
-                    <button className={styles.button}>
+                    <button className={styles.button} onClick={_addLiquidity}>
                       Add
                     </button>
                 </div>
@@ -235,7 +280,7 @@ export default function Home() {
                     />
                   <div className={styles.inputDiv}>
                     {`You will get ${utils.formatEther(removeCD)} CryptoDev Tokens and 
-                      ${utils.formatEther(removeEther)} Eth}`}
+                      ${utils.formatEther(removeEther)} Eth`}
                   </div>
                   <button className={styles.button} onClick={_removeLiquidity}>
                     Remove
@@ -244,6 +289,51 @@ export default function Home() {
               </div>
             )}
           </div>
+        </div>
+      )
+    } else {
+      return(
+        <div>
+          <div className={styles.description}>
+            You have:
+            <br />
+            {utils.formatEther(cdBalance)} Crypto Dev Tokens
+            <br />
+            {utils.formatEther(ethBalance)} Ether
+            <br />
+            {utils.formatEther(lpBalance)} Crypto Dev LP Tokens
+          </div>
+          <input 
+            type={"number"}
+            placeholder="Amount"
+            onChange={async(e) => {
+              setSwapAmount(e.target.value || "");
+              await _getAmountOfTokensReceivedFromSwap(e.target.value || "0");
+            }}
+            className={styles.input}
+            value={swapAmount}
+            />
+            <select
+              className={styles.select}
+              name="dropdown"
+              id="dropdown"
+              onChange={async()=> {
+                setEthSelected(!ethSelected);
+                await _getAmountOfTokensReceivedFromSwap(0);
+                setSwapAmount(zero);
+              }}
+              >
+                <option value={"eth"}>Ethereum</option>
+                <option value={"cryptoDevToken"}>Crypto Dev Token</option>
+              </select>
+              <br />
+              <div className={styles.inputDiv}>
+                {ethSelected ? `You will get ${utils.formatEther(tokensToBeReceivedAfterSwap)} Crypto Dev Tokens`
+                : `You will get ${utils.formatEther(tokensToBeReceivedAfterSwap)} Eth`}
+              </div>
+              <button className={styles.button1} onClick={_swapTokens}>
+                Swap
+              </button>
         </div>
       )
     }
@@ -264,13 +354,13 @@ export default function Home() {
           <div>
             <button className={styles.button}
             onClick={()=> {
-              console.log("set liquidity tab button")
+              setLiquidityTab(true)
             }}>
               Liquidity
             </button>
             <button className={styles.button}
             onClick={()=> {
-              console.log("set swap tab button")
+              setLiquidityTab(false)
             }}>
               Swap
             </button>
